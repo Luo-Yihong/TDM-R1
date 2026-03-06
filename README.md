@@ -3,7 +3,7 @@
 This is the Official Repository of  "TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward", by *Yihong Luo, Tianyang Hu, Weijian Luo, Jing Tang*.
 
 <div align="center">
-  <img src="figs/teaser_git.png" width="100%">
+  <img src="teaser_git.png" width="100%">
 </div>
 
 <p align="center">
