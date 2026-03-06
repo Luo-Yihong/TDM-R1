@@ -6,6 +6,61 @@ This is the Official Repository of  "TDM-R1: Reinforcing Few-Step Diffusion Mode
 
 - [TDM-R1-ZImage](https://huggingface.co/Luo-Yihong/TDM-R1)
 
+## Usage
+
+```python
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+import torch
+from diffusers import ZImagePipeline
+from peft import LoraConfig, get_peft_model
+def load_ema(pipeline, lora_path, adapter_name='default'):
+    """Load EMA weights into the pipeline's transformer adapter"""
+    pipeline.transformer.set_adapter(adapter_name)
+    trainable_params = [
+        p for n, p in pipeline.transformer.named_parameters()
+        if adapter_name in n and p.requires_grad
+    ]
+    state_dict = torch.load(lora_path, map_location=pipeline.transformer.device)
+    ema_params = state_dict["ema_parameters"]
+    assert len(trainable_params) == len(ema_params), \
+        f"Parameter count mismatch: {len(trainable_params)} vs {len(ema_params)}"
+    for param, ema_param in zip(trainable_params, ema_params):
+        param.data.copy_(ema_param.to(param.device))
+    print(f"Loaded EMA weights for adapter '{adapter_name}' from {lora_path}")
+pipeline = ZImagePipeline.from_pretrained(
+    "Tongyi-MAI/Z-Image-Turbo",
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=False,
+)
+transformer_lora_config = LoraConfig(
+    r=32,
+    lora_alpha=64,
+    init_lora_weights="gaussian",
+    target_modules=["to_q", "to_k", "to_v", "to_out.0", "add_k_proj", "add_v_proj"],
+)
+pipeline.transformer = get_peft_model(
+    pipeline.transformer,
+    transformer_lora_config,
+    adapter_name="tdmr1",
+)
+load_ema(
+    pipeline,
+    lora_path="./tdmr1_zimage_ema.ckpt",
+    adapter_name="tdmr1",
+)
+pipeline = pipeline.to("cuda")
+image = pipeline(
+      prompt=prompt,
+      height=1024,
+      width=1024,
+      num_inference_steps=5,  # This actually results in 4 DiT forwards
+      guidance_scale=0.0, 
+      generator=torch.Generator("cuda").manual_seed(xxx),
+  ).images[0]
+image
+```
+
 ## Contact
 
 Please contact Yihong Luo (yluocg@connect.ust.hk) if you have any questions about this work.
