@@ -81,3 +81,16 @@ image
 Please contact Yihong Luo (yluocg@connect.ust.hk) if you have any questions about this work.
 
 ## Bibtex
+```
+@misc{luo2025tdmr1,
+  title={TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward},
+  author={Yihong Luo and Tianyang Hu and Weijian Luo and Jing Tang},
+  year={2025},
+  eprint={TODO},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV}
+}
+
+```
+
+
