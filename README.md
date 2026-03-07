@@ -1,6 +1,11 @@
 # TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward
+<div align="center">
+  <a href="https://luo-yihong.github.io/TDM-R1-Page/"><img src="https://img.shields.io/static/v1?label=Project%20Page&message=Github&color=blue&logo=github-pages"></a> &ensp;
+  <a href="https://arxiv.org/abs/xxx"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv:YOSO&color=red&logo=arxiv"></a> &ensp;
+</div>
 
-This is the Official Repository of  "TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward", by *Yihong Luo, Tianyang Hu, Weijian Luo, Jing Tang*.
+
+This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward](https://arxiv.org/abs/xxx)", by *Yihong Luo, Tianyang Hu, Weijian Luo, Jing Tang*.
 
 <div align="center">
   <img src="teaser_git.png" width="100%">
