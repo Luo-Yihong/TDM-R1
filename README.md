@@ -5,7 +5,7 @@
 </div>
 
 
-This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward](https://arxiv.org/abs/xxx)", by *Yihong Luo, Tianyang Hu, Weijian Luo, Jing Tang*.
+This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Models with Non-Differentiable Reward](https://arxiv.org/abs/2603.07700)", by *Yihong Luo, Tianyang Hu, Weijian Luo, Jing Tang*.
 
 <div align="center">
   <img src="teaser_git.png" width="100%">
