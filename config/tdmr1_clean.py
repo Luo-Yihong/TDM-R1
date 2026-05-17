@@ -119,7 +119,6 @@ def geneval_sd3_8gpu_G24_24_4step():
 
     config.t_min_dgpo = 250
     config.rl_cfg = 2.5
-    config.train.beta_dpo = 100
     config.trunc_steps = 4
 
     config.reward_fn = {
