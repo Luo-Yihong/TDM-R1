@@ -136,9 +136,10 @@ TDM-R1 is controlled by a small set of keys spread across `config.train.*`, `con
 | --- | --- |
 | `config.train.beta_dpo`     | DPO beta on the group-preference loss; |
 | `config.train.beta`         | Penalty weight on the surrogate reward against the frozen model. `0` disables the KL term. |
-| `config.train.tdm_weight`   | Mix between the TDM loss (`loss_cfg_reward`) and the RL loss (`loss_reward`). |
-| `config.rl_cfg`             | CFG scale used in the RL loss. |
 | `config.clip_range`         | PPO-style clip range. |
+| `config.rl_cfg`             | CFG scale used in the RL loss. |
+| `config.train.tdm_weight`   | Mix between the TDM loss and the RL loss; Control the regularization strength of generator. |
+
 
 We provide a default configuration for the key hyper-parameters, which we found to perform reasonably well in most scenarios.
 ```python
