@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Training outputs
+logs/
+wandb/
+checkpoints/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local model / data caches (keep the in-repo dataset/ folder; ignore everything else)
+/models/
+/root/models/
+*.ckpt
+*.pth
+!flow_grpo/assets/*.pth

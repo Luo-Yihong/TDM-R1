@@ -16,6 +16,21 @@ This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Mod
 </p>
 
 
+## Table of Contents
+
+- [Pre-trained Model](#pre-trained-model)
+- [Usage](#usage)
+- [Start Training](#start-training)
+  - [Install](#1-install)
+  - [Download models](#2-download-models)
+  - [Launch training](#3-launch-training)
+  - [Hyper-parameter Recipes](#4-hyper-parameter-recipes)
+    - [Core Loss Coefficients](#core-loss-coefficients)
+- [Acknowledgement](#acknowledgement)
+- [Contact](#contact)
+- [Bibtex](#bibtex)
+
+
 ## Pre-trained Model
 
 - [TDM-R1-ZImage](https://huggingface.co/Luo-Yihong/TDM-R1)
@@ -74,6 +89,78 @@ image = pipeline(
   ).images[0]
 image
 ```
+
+## Start Training
+
+Reference implementation that reinforces SD3.5-Medium with the TDM-R1 objective.
+The released [TDM-R1-ZImage](https://huggingface.co/Luo-Yihong/TDM-R1) checkpoint
+above uses the same recipe on top of Z-Image-Turbo.
+
+### 1. Install
+
+```bash
+git clone https://github.com/Luo-Yihong/TDM-R1.git
+cd TDM-R1
+pip install -e .
+```
+
+### 2. Download models
+
+```bash
+bash download_models.sh
+```
+
+This pulls the SD3.5-Medium base model plus the reward backbones used by
+the launch scripts under [`scripts/single_node/`](scripts/single_node/)
+(ImageReward, HPSv2, PaddleOCR, Mask2Former + CLIP for GenEval) into
+`/root/models/` and the standard cache dirs. Set `MODELS_DIR=...` to redirect.
+
+### 3. Launch training
+
+Pick the per-task script that matches the reward you want to optimize:
+
+```bash
+bash scripts/single_node/tdmr1_ocr.sh           # OCR reward
+bash scripts/single_node/tdmr1_imagereward.sh   # ImageReward
+bash scripts/single_node/tdmr1_geneval.sh       # GenEval
+```
+
+
+### 4. Hyper-parameter Recipes
+
+#### Core Loss Coefficients
+
+TDM-R1 is controlled by a small set of keys spread across `config.train.*`, `config.sample.*`, and the top-level `config.*` namespace (see [config/base.py](config/base.py) and per-task presets in [config/tdmr1_clean.py](config/tdmr1_clean.py)):
+
+| Key | Meaning |
+| --- | --- |
+| `config.train.beta_dpo`     | DPO beta on the group-preference loss; |
+| `config.train.beta`         | Penalty weight on the surrogate reward against the frozen model. `0` disables the KL term. |
+| `config.train.tdm_weight`   | Mix between the TDM loss (`loss_cfg_reward`) and the RL loss (`loss_reward`). |
+| `config.rl_cfg`             | CFG scale used in the RL loss. |
+| `config.clip_range`         | PPO-style clip range. |
+
+We provide a default configuration for the key hyper-parameters, which we found to perform reasonably well in most scenarios.
+```python
+# excerpt from config/tdmr1_clean.py
+config.train.beta_dpo        = 1.0
+config.train.beta            = 0.001
+config.clip_range            = 1e-3 # or 2e-3, 5e-4
+config.train.tdm_weight      = 0.3 # or 0.2 0.4
+```
+
+Alternatively, you can apply stronger regularization for more stable training and better unseen metrics:
+```python
+# excerpt from config/tdmr1_clean.py
+config.train.beta_dpo        = 100.0
+config.train.beta            = 0.01
+config.clip_range            = 2e-3
+config.train.tdm_weight      = 0.3 # or 0.4 0.5
+```
+We note that in this public release, we use a frozen reference model for a cleaner implementation, avoiding the need to maintain an additional slow-EMA copy of surrogate reward.
+
+## Acknowledgement
+Our codebase is largely built upon [TDM](https://github.com/Luo-Yihong/TDM), [DGPO](https://github.com/Luo-Yihong/DGPO) and [Flow-GRPO](https://github.com/yifan123/flow_grpo). We thank the authors for their efforts to the open-source codebase.
 
 ## Contact
 
