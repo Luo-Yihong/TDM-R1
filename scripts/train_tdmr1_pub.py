@@ -136,7 +136,7 @@ def compute_group_dgpo_loss_allreduce(
     
     loss = (local_weights.detach() * advantages * dsm_loss).mean()
     
-    return loss, local_weights.detach().mean()
+    return loss
 
 def precompute_group_info(prompt_ids, accelerator):
     """用 prompt_ids 预计算 group 信息（更快）"""
@@ -1434,7 +1434,7 @@ def main(_):
                         ref_v = real_v_dgpo
                         ref_dsm_loss = 1 * (target_v_dgpo - ref_v).square().reshape(x0.shape[0],-1).mean(dim=1)
 
-                        dgpo_loss, scale_term = compute_group_dgpo_loss_allreduce(
+                        dgpo_loss = compute_group_dgpo_loss_allreduce(
                             dgpo_v, ref_v, target_v_dgpo, advantages,
                             group_info, accelerator, config.train.beta_dpo, group_size=config.sample.num_image_per_prompt, dsm_loss = dgpo_dsm_loss, ref_dsm_loss = ref_dsm_loss
                         )
@@ -1540,7 +1540,6 @@ def main(_):
                         info["tdmr1_cfg_loss"].append(loss_cfg.detach())
                         info["tdmr1_kl_loss"].append(loss_kl.detach())
                         info["loss"].append(loss.detach())
-                        info["scale_term"].append(scale_term.mean().detach())
                         info["dgpo_dsm_loss"].append(dgpo_dsm_loss.mean().detach())
                         info["dgpo_loss"].append(dgpo_loss.mean().detach())
                         info["dgpo_reg_loss"].append(loss_reg_dgpo.detach())
