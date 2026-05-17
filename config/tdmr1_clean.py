@@ -97,9 +97,6 @@ def general_ocr_sd3_8gpu_G24_4step():
 
     config.reward_fn = {
         "ocr": 1.0,
-        # "pickscore": 0.0,
-        # "imagereward": 0.0,
-        # "hpsv2": 0.0,
     }
     return config
 
