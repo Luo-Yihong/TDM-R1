@@ -29,6 +29,11 @@ This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Mod
 - [Acknowledgement](#acknowledgement)
 - [Contact](#contact)
 - [Bibtex](#bibtex)
+- 
+## 🔥News
+- (2026/05) The training code is released.
+- (2026/04) TDM-R1 is accepted to ICLR 2026 🎉!
+
 
 
 ## Pre-trained Model
