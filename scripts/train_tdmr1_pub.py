@@ -1502,7 +1502,9 @@ def main(_):
                         pipeline.transformer.set_adapter("tdm")
                         
                         err_kl = (kl_revised_x0 - model_x0).square()
-                        err_cfg_reward = (cfg_revised_x0 - model_x0).square() # We regard cfg as a reward following JDM (https://arxiv.org/abs/2503.06652) and DI++ (https://arxiv.org/abs/2410.18881).
+                        # We regard cfg as a reward following JDM (https://arxiv.org/abs/2503.06652)
+                        # and DI++ (https://arxiv.org/abs/2410.18881).
+                        err_cfg_reward = (cfg_revised_x0 - model_x0).square() 
                         err_tdm = err_cfg_reward + err_kl
                         if config.use_huber:
                             huber_c = 1e-3
