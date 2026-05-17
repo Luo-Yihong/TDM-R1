@@ -617,11 +617,7 @@ def main(_):
     )
     if accelerator.is_main_process:
         print(config)
-        base_name = "tdm_r1-clip-neat-FixV"
-        if config.use_ema_ref:
-            base_name += "-emaref"
-        else:
-            base_name += "-froref"
+        base_name = "TDM_R1"
         reward_parts = [
             k if float(v) == 1.0 else f"{k}{v}"
             for k, v in sorted(config.reward_fn.items())
@@ -630,7 +626,7 @@ def main(_):
         if reward_parts:
             base_name += f"-rwd_{'+'.join(reward_parts)}"
         unique_id = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
-        my_proj_name = f"{base_name}-G{config.sample.num_image_per_prompt}-{config.sample.num_steps}steps-beta{config.train.beta}-{config.train.beta_dpo}-BiasTmin{config.t_min_dgpo}-RwdTmin{config.t_min_dgpo_reward}-trunc{config.trunc_steps}-tdm_w{config.train.tdm_weight}_rlCFG{config.rl_cfg}"
+        my_proj_name = f"{base_name}-G{config.sample.num_image_per_prompt}-{config.sample.num_steps}steps-beta{config.train.beta}-{config.train.beta_dpo}-trunc{config.trunc_steps}-tdm_w{config.train.tdm_weight}_rlCFG{config.rl_cfg}"
         if config.use_tweight:
             my_proj_name += f"-t_w"
         my_proj_name += f"-RLbeta{config.train.rl_adam_beta1}"
