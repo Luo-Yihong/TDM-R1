@@ -1380,7 +1380,7 @@ def main(_):
                         beta_dgpo_train = (sigmas_tau_dgpo_train ** 2 - (sigmas_tnext_dgpo * alpha_dgpo_train) ** 2) ** 0.5
                         noise_diffuse_dgpo = generate_shared_noise_for_groups(x0, group_info, accelerator)
                         xtau_dgpo_train = xnext_dgpo * alpha_dgpo_train + beta_dgpo_train * noise_diffuse_dgpo
-                        # Let eta = 0, and gap between xt and xt-1 tends to 0, combine eq.x, we obtain the following target:
+                        # Let eta = 0, and gap between xt and xt-1 tends to 0, combine Eq. (9) in paper, we obtain the following target:
                         target_v_dgpo = - xnext_dgpo / (1 - sigmas_tnext_dgpo) + noise_diffuse_dgpo / beta_dgpo_train * (sigmas_tau_dgpo_train + sigmas_tnext_dgpo ** 2 * alpha_dgpo_train / (1 - sigmas_tnext_dgpo))  
                         with autocast():
                             with torch.no_grad():
