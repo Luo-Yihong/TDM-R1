@@ -39,6 +39,8 @@ def compressibility():
     config.resolution = 512
 
     # Training
+    config.train.learning_rate = 3e-4
+    config.train.learning_rate_fake = 3e-4
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.adam_beta1 = 0.
@@ -109,6 +111,7 @@ def geneval_sd3_8gpu_G24_24_4step():
     config.dataset = os.path.join(os.getcwd(), "dataset/geneval")
     config.prompt_fn = "geneval"
 
+    config.train.learning_rate_fake = 1e-4
     config.sample.train_batch_size = 6
     config.sample.num_batches_per_epoch = int(48/(gpu_number*config.sample.train_batch_size/config.sample.num_image_per_prompt))
     assert config.sample.num_batches_per_epoch % 2 == 0, "Please set config.sample.num_batches_per_epoch to an even number! This ensures that config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch / 2, so that gradients are updated twice per epoch."
