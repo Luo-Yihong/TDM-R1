@@ -886,7 +886,7 @@ def main(_):
 
     optimizer = optimizer_cls(
         transformer_trainable_parameters,
-        lr=config.train.learning_rate / 4,
+        lr=config.train.learning_rate_fake / 4,
         betas=(config.train.adam_beta1, config.train.adam_beta2),
         weight_decay=config.train.adam_weight_decay,
         eps=config.train.adam_epsilon,
@@ -894,7 +894,7 @@ def main(_):
 
     optimizer_fake = optimizer_cls(
         fake_transformer_trainable_parameters,
-        lr=config.train.learning_rate,
+        lr=config.train.learning_rate_fake,
         betas=(config.train.adam_beta1, config.train.adam_beta2),
         weight_decay=config.train.adam_weight_decay,
         eps=config.train.adam_epsilon,
