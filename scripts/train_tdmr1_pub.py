@@ -26,6 +26,7 @@ from flow_grpo.diffusers_patch.sd3_pipeline_tdmr1 import pipeline_with_logprob
 from flow_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob
 from flow_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
 import torch
+from torch import nn
 import wandb
 from functools import partial
 import tqdm
@@ -39,6 +40,14 @@ from flow_grpo.ema import EMAModuleWrapper
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid, save_image
 import torch.distributed as dist
+
+
+def get_all_linear_full_names(model):
+    """Return every nn.Linear module path in `model`."""
+    return [
+        name for name, module in model.named_modules()
+        if isinstance(module, nn.Linear)
+    ]
 
 
 def convert(x, s=7):
@@ -106,7 +115,7 @@ logger = get_logger(__name__)
 
 def compute_group_dgpo_loss_allreduce(
     model_v, ref_old_v, target_v, advantages,
-    group_info, accelerator, beta_dpo, group_size = 24, dsm_loss = None, ref_dsm_loss = None,
+    group_info, accelerator, beta_dpo, group_size = 24, dsm_loss = None, ref_dsm_loss = None, ada_weight = False,
 ):
     """AllReduce实现的梯度等价版本"""
     batch_size = model_v.shape[0]
@@ -118,6 +127,14 @@ def compute_group_dgpo_loss_allreduce(
         with torch.no_grad():
             ref_dsm_loss = (target_v - ref_old_v).square().reshape(batch_size, -1).mean(dim=1)
     
+    weighting_factor = torch.abs(target_v.double() - model_v.double() ).detach()
+    weighting_ref = torch.abs(target_v.double() - ref_old_v.double() ).detach()
+    weighting_factor = weighting_factor.reshape(batch_size, -1).mean(dim=1)
+    weighting_ref = weighting_ref.reshape(batch_size, -1).mean(dim=1)
+    if ada_weight:
+        dsm_loss = dsm_loss / weighting_factor
+        ref_dsm_loss = ref_dsm_loss / weighting_ref
+
     delta_diff = dsm_loss.detach() - ref_dsm_loss.detach()
     per_sample_term = advantages * beta_dpo * delta_diff / group_size
     
@@ -583,6 +600,90 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
 
+
+def setup_lora_and_load_ema(pipeline, accelerator, config):
+    """Build the wide all-linear `tdm` LoRA and, when `config.train.lora_path`
+    is set, remap a narrow (8 attn-projection) TDM LoRA EMA into it.
+    Returns {"need_remap", "copied", "kept_default"}.
+    """
+    OLD_TARGETS = [
+        "attn.add_k_proj", "attn.add_q_proj", "attn.add_v_proj",
+        "attn.to_add_out", "attn.to_k", "attn.to_out.0",
+        "attn.to_q", "attn.to_v",
+    ]
+    OLD_R, OLD_ALPHA = 32, 64
+    NEW_TARGETS = get_all_linear_full_names(pipeline.transformer)
+    NEW_R, NEW_ALPHA = 32, 64
+
+    def _canon(name):
+        while name.startswith("base_model.model."):
+            name = name[len("base_model.model."):]
+        return name
+
+    if not config.use_lora:
+        return {"need_remap": False, "copied": 0, "kept_default": 0}
+
+    need_remap = bool(config.train.lora_path)
+
+    cached_lora = None
+    if need_remap:
+        old_cfg = LoraConfig(
+            r=OLD_R, lora_alpha=OLD_ALPHA,
+            init_lora_weights="gaussian",
+            target_modules=OLD_TARGETS,
+        )
+        pipeline.transformer = get_peft_model(
+            pipeline.transformer, old_cfg, adapter_name="tdm"
+        )
+
+        old_tdm_params = [
+            p for n, p in pipeline.transformer.named_parameters()
+            if "tdm" in n and p.requires_grad
+        ]
+        old_ema_tmp = EMAModuleWrapper(
+            old_tdm_params, decay=0, update_step_interval=1,
+            device=accelerator.device,
+        )
+        old_ema_tmp.load(config.train.lora_path)
+        old_ema_tmp.copy_ema_to(old_tdm_params, store_temp=False)
+
+        cached_lora = {}
+        for n, p in pipeline.transformer.named_parameters():
+            if "lora_" in n and "tdm" in n:
+                cached_lora[_canon(n)] = p.detach().clone()
+        del old_ema_tmp
+
+        while isinstance(pipeline.transformer, PeftModel):
+            pipeline.transformer = pipeline.transformer.unload()
+
+    new_cfg = LoraConfig(
+        r=NEW_R, lora_alpha=NEW_ALPHA,
+        init_lora_weights="gaussian",
+        target_modules=NEW_TARGETS,
+    )
+    pipeline.transformer = get_peft_model(
+        pipeline.transformer, new_cfg, adapter_name="tdm"
+    )
+
+    hit, miss = 0, 0
+    if need_remap:
+        with torch.no_grad():
+            for n, p in pipeline.transformer.named_parameters():
+                if "lora_" not in n or "tdm" not in n:
+                    continue
+                src = cached_lora.get(_canon(n))
+                if src is not None and src.shape == p.shape:
+                    p.data.copy_(src.to(p.device, dtype=p.dtype))
+                    hit += 1
+                else:
+                    miss += 1
+        del cached_lora
+        if accelerator.is_main_process:
+            print(f"[LoRA remap] tdm copied={hit}, tdm kept_default={miss}")
+
+    return {"need_remap": need_remap, "copied": hit, "kept_default": miss}
+
+
 def main(_):
     # basic Accelerate and logging setup
     config = FLAGS.config
@@ -688,9 +789,9 @@ def main(_):
     
     pipeline.transformer.to(accelerator.device)
 
+    remap_info = {"need_remap": False, "copied": 0, "kept_default": 0}
     if config.use_lora:
-        # Set correct lora layers
-        target_modules = [
+        narrow_target_modules = [
             "attn.add_k_proj",
             "attn.add_q_proj",
             "attn.add_v_proj",
@@ -700,15 +801,27 @@ def main(_):
             "attn.to_q",
             "attn.to_v",
         ]
-        transformer_lora_config = LoraConfig(
+        narrow_lora_config = LoraConfig(
             r=32,
             lora_alpha=64,
             init_lora_weights="gaussian",
-            target_modules=target_modules,
+            target_modules=narrow_target_modules,
         )
-        pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="tdm")
-        pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="fake")
-        pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="dgpo")
+        if config.train.lora_remap:
+            wide_target_modules = get_all_linear_full_names(pipeline.transformer)
+            wide_lora_config = LoraConfig(
+                r=32,
+                lora_alpha=64,
+                init_lora_weights="gaussian",
+                target_modules=wide_target_modules,
+            )
+            remap_info = setup_lora_and_load_ema(pipeline, accelerator, config)
+            pipeline.transformer = get_peft_model(pipeline.transformer, wide_lora_config, adapter_name="fake")
+            pipeline.transformer = get_peft_model(pipeline.transformer, narrow_lora_config, adapter_name="dgpo")
+        else:
+            pipeline.transformer = get_peft_model(pipeline.transformer, narrow_lora_config, adapter_name="tdm")
+            pipeline.transformer = get_peft_model(pipeline.transformer, narrow_lora_config, adapter_name="fake")
+            pipeline.transformer = get_peft_model(pipeline.transformer, narrow_lora_config, adapter_name="dgpo")
         
     
     pipeline.transformer.set_adapter("tdm")
@@ -738,10 +851,19 @@ def main(_):
 
     ema_old = EMAModuleWrapper(dgpo_transformer_trainable_parameters, decay=0, update_step_interval=1, device=accelerator.device)
 
-    if config.train.lora_path:
-        print(f"Loading from {config.train.lora_path}")
-        ema.load(f"{config.train.lora_path}")
-        ema.copy_ema_to(transformer_trainable_parameters)
+    if config.train.lora_remap:
+        if remap_info["need_remap"] and accelerator.is_main_process:
+            print(
+                f"[LoRA remap] EMA wrapper initialised from remapped tdm params "
+                f"(copied={remap_info['copied']}, kept_default={remap_info['kept_default']})"
+            )
+    else:
+        # Narrow-LoRA path: load the pretrained TDM Narrow-lora EMA directly into the
+        # EMA wrapper and overwrite the matching transformer parameters.
+        if config.train.lora_path:
+            print(f"Loading from {config.train.lora_path}")
+            ema.load(f"{config.train.lora_path}")
+            ema.copy_ema_to(transformer_trainable_parameters)
 
     
     # Enable TF32 for faster training on Ampere GPUs,
@@ -1432,7 +1554,7 @@ def main(_):
 
                         dgpo_loss = compute_group_dgpo_loss_allreduce(
                             dgpo_v, ref_v, target_v_dgpo, advantages,
-                            group_info, accelerator, config.train.beta_dpo, group_size=config.sample.num_image_per_prompt, dsm_loss = dgpo_dsm_loss, ref_dsm_loss = ref_dsm_loss
+                            group_info, accelerator, config.train.beta_dpo, group_size=config.sample.num_image_per_prompt, dsm_loss = dgpo_dsm_loss, ref_dsm_loss = ref_dsm_loss, ada_weight = getattr(config, 'use_ada_weight', False),
                         )
 
                         t_weight = 1
