@@ -70,6 +70,9 @@ def compressibility():
     config.clip_range = 1e-3
     config.rl_cfg = 4.5
     config.t_min_dgpo_reward = 550
+    config.train.lora_remap = False
+    config.use_ada_weight = False
+
 
     # Prompts / rewards
     config.prompt_fn = "general_ocr"
@@ -118,6 +121,9 @@ def geneval_sd3_8gpu_G24_24_4step():
     config.rl_cfg = 2.5
     config.trunc_steps = 4
 
+    config.train.lora_remap = True
+    config.use_ada_weight = True
+    
     config.reward_fn = {
         "geneval": 1.0,
     }
