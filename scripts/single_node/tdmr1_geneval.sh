@@ -10,6 +10,8 @@ set -euo pipefail
 CMD_TDMR1="accelerate launch --config_file scripts/accelerate_configs/multi_gpu.yaml --num_processes=8 scripts/train_tdmr1_pub.py"
 
 $CMD_TDMR1 --config config/tdmr1_clean.py:geneval_sd3_8gpu_G24_24_4step \
+    --config.train.lora_remap=True \
+    --config.use_ada_weight=True \
     --config.num_train_timesteps=2 \
     --config.t_min_dgpo=250 \
     --config.rl_cfg=2.5 \
