@@ -14,7 +14,7 @@ import subprocess
 from absl import app, flags
 from accelerate import Accelerator
 from ml_collections import config_flags
-from accelerate.utils import set_seed, ProjectConfiguration
+from accelerate.utils import set_seed, ProjectConfiguration, DistributedDataParallelKwargs
 from accelerate.logging import get_logger
 from diffusers import StableDiffusion3Pipeline, DPMSolverMultistepScheduler
 from diffusers.utils.torch_utils import is_compiled_module
@@ -715,6 +715,7 @@ def main(_):
         # number of *samples* we accumulate across, so we need to multiply by the number of training timesteps to get
         # the total number of optimizer steps to accumulate across.
         gradient_accumulation_steps=config.train.gradient_accumulation_steps * num_train_timesteps,
+        kwargs_handlers=[DistributedDataParallelKwargs(find_unused_parameters=True)],
     )
     if accelerator.is_main_process:
         print(config)
@@ -995,6 +996,11 @@ def main(_):
     # more memory
     autocast = contextlib.nullcontext if config.use_lora else accelerator.autocast
     # autocast = accelerator.autocast
+
+    # DDP only registers parameters with requires_grad=True at wrap time, while PEFT's
+    # set_adapter() freezes inactive adapters; enable all three so every adapter is all-reduced.
+    for p in transformer_trainable_parameters + fake_transformer_trainable_parameters + dgpo_transformer_trainable_parameters:
+        p.requires_grad_(True)
 
     # Prepare everything with our `accelerator`.
     transformer, optimizer, optimizer_fake, optimizer_dgpo, train_dataloader, test_dataloader = accelerator.prepare(transformer, optimizer, optimizer_fake, optimizer_dgpo, train_dataloader, test_dataloader)
