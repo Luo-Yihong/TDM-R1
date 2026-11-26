@@ -31,6 +31,7 @@ This is the Official Repository of  "[TDM-R1: Reinforcing Few-Step Diffusion Mod
 - [Bibtex](#bibtex)
   
 ## 🔥News
+- (2026/11) Fix a bug in the public version: the gradients of the TDM generator and the fake DSM are not properly synchronized. If you have tried the open-source code for TDM-R1 before, it may be far from achieving optimal performance.
 - (2026/05) The training code is released.
 - (2026/04) TDM-R1 is accepted to ICML 2026 🎉!
 
